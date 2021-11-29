@@ -11,10 +11,10 @@ __version__ = "1"
 import torch
 
 class FullyConnectedNeuralNetwork(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim):
         super().__init__()
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(2, 11),
+            torch.nn.Linear(input_dim, 11),
             torch.nn.BatchNorm1d(11),
             torch.nn.ELU(),
             torch.nn.Linear(11, 11),

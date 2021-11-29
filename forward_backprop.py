@@ -18,6 +18,8 @@ from tqdm import tqdm
 
 from fcnn import FullyConnectedNeuralNetwork
 
+torch.autograd.set_detect_anomaly(True)
+
 def reward_function(price):
     return torch.clip(price - 120, min=0) - 2 * torch.clip(price - 150, min=0)
 
@@ -35,19 +37,17 @@ batch_size = 512
 loss_func = torch.nn.MSELoss()
 tb_writer = torch.utils.tensorboard.SummaryWriter()
 
-model = FullyConnectedNeuralNetwork()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-y_0 = torch.nn.Parameter(torch.ones(1, requires_grad=True))
-optimizer.add_param_group({"params": y_0})
-
-z_0 = torch.ones(1, requires_grad=True)
+value_model = FullyConnectedNeuralNetwork(input_dim=1)
+policy_model = FullyConnectedNeuralNetwork(input_dim=2)
+optimizer = torch.optim.Adam(policy_model.parameters(), lr=1e-2)
 
 for i_iter in tqdm(range(n_iter)):
-    x = torch.zeros(batch_size, 1) + 120
-    y = torch.zeros_like(x) + y_0
+    x = torch.rand(batch_size, 1) * 100 + 70
+    y0 = value_model(x)
+    y = torch.ones_like(y0) * y0
 
     for t in np.linspace(0, 1, n_time_step + 1):
-        z = model(torch.concat([x, torch.zeros_like(x) + t], dim=1))
+        z = policy_model(torch.concat([x, torch.zeros_like(x) + t], dim=1))
         dw = torch.randn_like(x)
         dx = x * (risk_free_rate * dt + torch.randn_like(x) * volatility * sqrt_dt)
         dy = risk_free_rate * y * dt + volatility * x * z * dw
@@ -61,7 +61,13 @@ for i_iter in tqdm(range(n_iter)):
     loss.backward()
     optimizer.step()
 
-    tb_writer.add_scalar("Y_0", y_0.item(), i_iter)
+    if i_iter % 20 == 0:
+        with torch.no_grad():
+            x = torch.linspace(70, 170, 1000)
+            y = value_model(x.reshape(-1, 1))
+            plt.plot(x, y)
+            plt.savefig(f"fig/{i_iter}")
+            plt.close()
 
 with open("model.pkl", "wb") as writer:
-    pickle.dump(model, writer)
+    pickle.dump(policy_model, writer)

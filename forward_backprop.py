@@ -8,6 +8,7 @@ __author__ = "Chengyang Gu"
 __email__ = "chengyang.gu@nyu.edu"
 __version__ = "1"
 
+import itertools
 import pickle
 
 import matplotlib.pyplot as plt
@@ -39,20 +40,20 @@ tb_writer = torch.utils.tensorboard.SummaryWriter()
 
 value_model = FullyConnectedNeuralNetwork(input_dim=1)
 policy_model = FullyConnectedNeuralNetwork(input_dim=2)
-optimizer = torch.optim.Adam(policy_model.parameters(), lr=1e-2)
+optimizer = torch.optim.Adam(itertools.chain(value_model.parameters(), policy_model.parameters()), lr=1e-2)
 
 for i_iter in tqdm(range(n_iter)):
     x = torch.rand(batch_size, 1) * 100 + 70
-    y0 = value_model(x)
-    y = torch.ones_like(y0) * y0
+    y = value_model(x)
+    y0 = torch.nn.Parameter(torch.rand(()))
 
     for t in np.linspace(0, 1, n_time_step + 1):
         z = policy_model(torch.concat([x, torch.zeros_like(x) + t], dim=1))
         dw = torch.randn_like(x)
         dx = x * (risk_free_rate * dt + torch.randn_like(x) * volatility * sqrt_dt)
         dy = risk_free_rate * y * dt + volatility * x * z * dw
-        x += dx
-        y += dy
+        x = x + dx
+        y = y + dy
 
     loss = loss_func(y, reward_function(x))
     tb_writer.add_scalar("Loss", loss.item(), i_iter)
